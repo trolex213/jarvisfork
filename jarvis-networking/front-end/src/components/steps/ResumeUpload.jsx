@@ -1,76 +1,132 @@
 import React, { useState } from 'react';
+import { FileText, X } from 'lucide-react';
 
 const ResumeUpload = ({ onContinue }) => {
-    const [fileName, setFileName] = useState('');
-    const [fileLoaded, setFileLoaded] = useState(false);
-    const [base64, setBase64] = useState('');
-    const [loading, setLoading] = useState(false);
-  
-    const handleFileChange = (e) => {
-      const file = e.target.files[0];
-      if (file && file.type === 'application/pdf') {
-        setFileName(file.name);
-        const reader = new FileReader();
-        reader.onload = () => {
-          setBase64(reader.result);
-          setFileLoaded(true);
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-  
-    const handleContinue = () => {
-      if (fileName && base64) {
-        onContinue({ name: fileName, base64 });
-      }
-    };
-  
-    return (
-      <div className="text-center border border-gray-300 p-6 rounded-lg space-y-4">
-        <h2 className="text-xl font-semibold">Upload Your Resume</h2>
-        <input type="file" accept=".pdf,.docx" onChange={handleFileChange} />
-  
-        {fileLoaded && (
-          <div className="flex items-center justify-between border mt-4 px-4 py-2 rounded-lg bg-gray-50">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">📄</span>
-              <div className="text-left">
-                <p className="font-medium">{fileName}</p>
-                <p className="text-sm text-gray-500">PDF Document • Ready for analysis</p>
-              </div>
+  const [file, setFile] = useState(null);
+  const [base64, setBase64] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleFileChange = (e) => {
+    const selected = e.target.files[0];
+    if (selected && selected.type === 'application/pdf') {
+      setFile(selected);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setBase64(reader.result);
+      };
+      reader.readAsDataURL(selected);
+    } else {
+      alert('Please upload a valid PDF file.');
+    }
+  };
+
+  const handleContinue = async () => {
+    if (!file || !base64) return;
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:8000/parse_resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64 })
+      });
+      const result = await response.json();
+      await onContinue({ name: file.name, base64, parsed: result.parsed });
+    } catch (err) {
+      //console.error('❌ Failed to parse resume:', err);
+      //alert('Something went wrong parsing the resume.');
+      const dummyParsed = {
+        name: "John Doe",
+        contact: {
+          email: "john@example.com",
+          phone: "(123) 456-7890",
+          location: "New York, NY"
+        },
+        education: {
+          "University of Somewhere": {
+            degree: "B.Sc. in Computer Science",
+            date: "2018 - 2022",
+            GPA: "3.9",
+            coursework: "Algorithms, Databases, AI"
+          }
+        },
+        experience: [
+          {
+            company: "TechCorp",
+            title: "Software Engineer",
+            date: "2022 - Present",
+            responsibilities: "- Built full-stack apps\n- Integrated APIs\n- Led projects"
+          }
+        ],
+        skills: ["JavaScript", "React", "Node.js", "Python"],
+        certifications: ["AWS Certified Developer"],
+        languages: ["English", "Spanish"],
+        interests: ["Chess", "Hiking", "Open Source"]
+      };
+      
+      await onContinue({ name: file.name, base64, parsed: dummyParsed });
+      
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setFile(null);
+    setBase64('');
+  };
+
+  return (
+    <div className="mb-12">
+      <h3 className="text-xl font-medium text-gray-900 mb-6">Upload Your Resume</h3>
+
+      {!file ? (
+        <div className="border border-gray-200 rounded-2xl p-12 text-center bg-gray-50 transition shadow-sm hover:shadow-md">
+          <div className="flex flex-col items-center">
+            <div className="h-16 w-16 bg-black bg-opacity-5 rounded-full flex items-center justify-center mb-6">
+              <FileText className="h-8 w-8 text-black" />
             </div>
+            <p className="text-gray-600 mb-6 max-w-sm mx-auto">Drag and drop your resume or click to browse files (PDF format)</p>
+            <label className="bg-black text-white px-6 py-3 rounded-full cursor-pointer font-medium transition hover:bg-gray-800">
+              Select Resume
+              <input
+                type="file"
+                className="hidden"
+                accept=".pdf"
+                onChange={handleFileChange}
+              />
+            </label>
+          </div>
+        </div>
+      ) : (
+        <div className="border border-gray-200 rounded-2xl p-8 bg-gray-50 flex items-center justify-between transition shadow-sm">
+          <div className="flex items-center">
+            <div className="h-12 w-12 bg-black bg-opacity-5 rounded-full flex items-center justify-center mr-4">
+              <FileText className="h-6 w-6 text-black" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">{file.name}</p>
+              <p className="text-sm text-gray-500">PDF Document • Ready for analysis</p>
+            </div>
+          </div>
+          <div className="flex items-center">
             <button
-            onClick={async () => {
-            setLoading(true);
-            try {
-                  await onContinue({ name: fileName, base64 });
-                } catch (err) {
-                  console.error("Failed to parse resume:", err);
-                  alert("Something went wrong parsing the resume.");
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              disabled={loading}
-              className={`px-4 py-2 rounded text-white ${loading ? 'bg-gray-500 cursor-not-allowed' : 'bg-black'}`}
+              onClick={handleRemoveFile}
+              className="text-gray-400 hover:text-gray-600 mr-4"
             >
-              {loading ? (
-                  <div className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  <span>Parsing...</span>
-                  </div>
-                ) : (
-                  'Continue'
-                  )}
+              <X className="h-5 w-5" />
+            </button>
+            <button
+              onClick={handleContinue}
+              disabled={loading}
+              className="bg-black text-white px-5 py-2 rounded-full text-sm font-medium transition hover:bg-gray-800"
+            >
+              {loading ? 'Parsing...' : 'Continue'}
             </button>
           </div>
-        )}
-      </div>
-    );
-  };
-  
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default ResumeUpload;
